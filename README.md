@@ -37,6 +37,12 @@ Review findings can be pinned onto the files they name (`--findings`).
 <img src="docs/images/plan-only.png" alt="Plan-only view: the files a plan declares, before any code exists" width="49%">
 </p>
 
+## Live examples
+
+**https://nomarlo.github.io/arch-lens/**: [as-built with the plan overlay](https://nomarlo.github.io/arch-lens/examples/add-refunds.html)
+and [plan only](https://nomarlo.github.io/arch-lens/examples/add-refunds-plan-only.html).
+Both are regenerated from the current code on every push to `main`.
+
 ## Try it on the example
 
 ```bash
