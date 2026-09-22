@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/nomarlo/arch-lens/schema/model.schema.json",
+  "$id": "https://github.com/nomarlo/agent-workbench/plugins/arch-lens/schema/model.schema.json",
   "title": "arch-lens model",
   "description": "What the viewer renders. `arch-lens --json` writes it; an extractor contributes nodes, edges and flows in this shape.",
   "type": "object",

@@ -14,7 +14,7 @@ keywords = ["architecture", "code-review", "diagrams", "mermaid", "claude-code"]
 dependencies = []
 
 [project.urls]
-Repository = "https://github.com/nomarlo/arch-lens"
+Repository = "https://github.com/nomarlo/agent-workbench/tree/main/plugins/arch-lens"
 
 [project.scripts]
 arch-lens = "arch_lens.cli:main"

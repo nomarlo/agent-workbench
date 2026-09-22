@@ -1,9 +1,15 @@
-name: ci
+name: arch-lens
 
 on:
   push:
     branches: [main]
+    paths: ["plugins/arch-lens/**", ".github/workflows/ci-arch-lens.yml"]
   pull_request:
+    paths: ["plugins/arch-lens/**", ".github/workflows/ci-arch-lens.yml"]
+
+defaults:
+  run:
+    working-directory: plugins/arch-lens
 
 jobs:
   test:

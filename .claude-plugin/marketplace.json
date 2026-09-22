@@ -1,13 +1,11 @@
 {
-  "name": "arch-lens",
-  "description": "Arch Lens: generated architecture views of a git branch, for Claude Code.",
-  "owner": {
-    "name": "Noé López"
-  },
+  "name": "agent-workbench",
+  "description": "Tools that make agent-driven development verifiable: generated architecture views, gates and workflows for Claude Code.",
+  "owner": { "name": "Noé López" },
   "plugins": [
     {
       "name": "arch-lens",
-      "source": "./",
+      "source": "./plugins/arch-lens",
       "description": "Generated, plan-vs-as-built architecture views of a git branch."
     }
   ]

@@ -1,7 +1,7 @@
 name: pages
 
-# Regenerates the example pages from the current code on every push to main, so the
-# published demo can never drift from what the generator actually produces.
+# Every plugin with an executable site/build publishes its live demo under /<plugin>/,
+# regenerated from the current code on every push, next to the catalog at the root.
 on:
   push:
     branches: [main]
@@ -27,12 +27,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Generate the example pages
+      - name: Build every plugin's site
         run: |
-          mkdir -p _site/examples
-          python examples/build_demo.py --out _site/examples
+          mkdir -p _site
           cp site/index.html _site/index.html
-          cp -r docs/images _site/images
+          for build in plugins/*/site/build; do
+            plugin="$(basename "$(dirname "$(dirname "$build")")")"
+            echo "::group::$plugin"
+            "$build" "_site/$plugin"
+            echo "::endgroup::"
+          done
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

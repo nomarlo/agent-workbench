@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Builds this plugin's part of the Pages site into $1 (served at /<plugin>/).
+# Contract for every plugin: an executable site/build that takes the output directory.
+set -euo pipefail
+out="$1"
+here="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$out/examples"
+python3 "$here/examples/build_demo.py" --out "$out/examples"
+cp "$here/site/index.html" "$out/index.html"
+cp -r "$here/docs/images" "$out/images"
