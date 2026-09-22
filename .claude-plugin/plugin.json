@@ -1,0 +1,9 @@
+{
+  "name": "arch-lens",
+  "version": "0.1.0",
+  "description": "Generated, plan-vs-as-built architecture views of a git branch: components in layer lanes, class diagram, call-graph flows, layer violations.",
+  "author": { "name": "Noé López" },
+  "repository": "https://github.com/nomarlo/arch-lens",
+  "license": "MIT",
+  "keywords": ["architecture", "code-review", "diagrams", "mermaid"]
+}

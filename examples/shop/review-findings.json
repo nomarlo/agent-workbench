@@ -1,0 +1,4 @@
+[
+  {"file": "orders/models.py", "summary": "models.py imports REFUND_WINDOW_DAYS from services: the model layer now depends on the layer above it. Move the constant down, or pass the window in."},
+  {"summary": "money.py is not in the plan; either add it to Changes by layer or inline to_cents where it is used."}
+]

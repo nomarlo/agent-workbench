@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nomarlo/arch-lens/schema/model.schema.json",
+  "title": "arch-lens model",
+  "description": "What the viewer renders. `arch-lens --json` writes it; an extractor contributes nodes, edges and flows in this shape.",
+  "type": "object",
+  "required": ["project", "slug", "lanes", "nodes", "edges", "flows", "plan_flows", "plan_only", "has_plan", "violations", "unmatched_findings", "layer_colors", "overview"],
+  "properties": {
+    "project": {"type": "string"},
+    "slug": {"type": "string"},
+    "branch": {"type": "string"},
+    "head": {"type": "string"},
+    "base": {"type": ["string", "null"]},
+    "base_sha": {"type": ["string", "null"]},
+    "plan": {"type": ["string", "null"]},
+    "plan_only": {"type": "boolean"},
+    "has_plan": {"type": "boolean"},
+    "lanes": {"type": "array", "items": {"type": "string"}, "description": "Lane order, top to bottom; every node.layer is one of these."},
+    "layer_colors": {"type": "object", "additionalProperties": {"type": "string"}},
+    "violations": {"type": "integer"},
+    "unmatched_findings": {"type": "array", "items": {"type": "string"}},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
+    "plan_flows": {"type": "array", "items": {"$ref": "#/$defs/mermaidFlow"}},
+    "overview": {"type": "object", "properties": {"l1": {"type": "string"}, "l2": {"type": "string"}}}
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["id", "path", "label", "layer", "group", "lang", "build", "plan", "members", "findings"],
+      "properties": {
+        "id": {"type": "string"},
+        "path": {"type": "string", "description": "Repo-relative path, or `external:<label>` for a boundary."},
+        "label": {"type": "string"},
+        "layer": {"type": "string"},
+        "group": {"type": "string"},
+        "lang": {"enum": ["py", "ts", "ext"]},
+        "build": {"enum": ["changed", "reused", "missing", "external"]},
+        "plan": {"enum": ["planned", "unplanned", "missing", null]},
+        "members": {"type": "array", "items": {"type": "string"}, "description": "UML-ish member lines: `+name(args) Return`, `-private()`, `+class X`, `+CONSTANT`."},
+        "planned_members": {"type": "array", "items": {"type": "string"}},
+        "findings": {"type": "array", "items": {"type": "string"}},
+        "contract": {"type": "array", "description": "Exports with checker-printed signatures (TypeScript extractor)."},
+        "functions": {"type": "array"},
+        "ts": {"type": "object", "description": "TypeScript graph metadata: distance, hub, seed, viaPort, inDelta."}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["f", "t", "kind", "label"],
+      "properties": {
+        "f": {"type": "string"},
+        "t": {"type": "string"},
+        "kind": {"enum": ["import", "call", "port", "implements", "declared", "external", "planned"]},
+        "label": {"type": "string"},
+        "violation": {"type": "boolean"},
+        "symbols": {"type": "array", "items": {"type": "object", "properties": {"symbol": {"type": "string"}, "count": {"type": "integer"}}}},
+        "sites": {"type": "array", "items": {"type": "object", "properties": {"fn": {"type": "string"}, "line": {"type": "integer"}, "text": {"type": "string"}}}}
+      }
+    },
+    "flow": {"oneOf": [{"$ref": "#/$defs/mermaidFlow"}, {"$ref": "#/$defs/structuredFlow"}]},
+    "mermaidFlow": {
+      "type": "object",
+      "required": ["label", "mermaid"],
+      "properties": {"label": {"type": "string"}, "mermaid": {"type": "string"}, "why": {"type": "string"}, "source": {"type": "string"}}
+    },
+    "structuredFlow": {
+      "type": "object",
+      "description": "Rendered by the viewer, which can then toggle argument detail, private helpers and external participants.",
+      "required": ["label", "parts", "order", "steps"],
+      "properties": {
+        "label": {"type": "string"},
+        "source": {"type": "string"},
+        "parts": {"type": "object", "additionalProperties": {
+          "type": "object",
+          "required": ["label", "layer", "stereo", "ext"],
+          "properties": {"label": {"type": "string"}, "layer": {"type": "string"}, "stereo": {"type": "string"}, "ext": {"type": "boolean"}, "side": {"enum": ["L", "R"]}}
+        }},
+        "order": {"type": "array", "items": {"type": "string"}},
+        "steps": {"type": "array", "items": {
+          "type": "object",
+          "properties": {
+            "f": {"type": "string"}, "t": {"type": "string"}, "call": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}},
+            "ret": {"type": "string"},
+            "kind": {"enum": ["fn", "http", "queue", "orm"]},
+            "priv": {"type": "boolean"}, "wire": {"type": "string"},
+            "ctl": {"enum": ["alt", "else", "opt", "loop", "end", "note"], "description": "A control step (no arrow): opens or closes a mermaid block, or a note over f..t."},
+            "text": {"type": "string"}
+          }
+        }}
+      }
+    }
+  }
+}

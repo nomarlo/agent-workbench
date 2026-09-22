@@ -1,0 +1,139 @@
+# arch-lens.toml — every key, with its default. Copy to the root of your repository and
+# delete what you do not need. Paths are repo-relative and use forward slashes.
+# Globs: `**/` spans zero or more directories, `*` stays inside one path segment.
+
+[project]
+name = "my-service"              # page title; default: the repository folder name
+base = "origin/main"             # the delta is measured against merge-base(base, HEAD);
+                                 # default: origin/main, main, origin/master, master
+# exclude = [...]                # files never drawn; the default drops tests, migrations,
+                                 # build output, node_modules and stories
+
+# ------------------------------------------------------------------------------ layers
+# One lane per layer, top to bottom in this order. `rank` sets the allowed dependency
+# direction: an import or call from a lower rank to a higher one (or within one rank) is
+# fine; one that points to a lower rank is drawn red and counted as a layer violation.
+# A layer without `rank` is exempt. A file matching no layer lands in the `other` lane
+# (TypeScript files: in a lane named after their package). First match wins.
+
+[[layers]]
+name = "views"
+paths = ["**/views.py", "**/views/**", "**/urls.py"]
+rank = 0
+# color = "#2a78d6"              # optional; otherwise picked from a palette
+
+[[layers]]
+name = "services"
+paths = ["**/services.py", "**/services/**"]
+rank = 1
+
+[[layers]]
+name = "models"
+paths = ["**/models.py", "**/models/**"]
+rank = 2
+
+[[layers]]
+name = "tasks"                   # no rank: tasks call services and services enqueue tasks
+paths = ["**/tasks.py", "**/tasks/**"]
+
+# ------------------------------------------------------------------------------ groups
+# Nodes are also tagged with a group (an app, a package, a bounded context), shown as a
+# badge and used as the class-diagram stereotype. The first capture group of the first
+# matching regex wins; the default is the first path segment.
+[groups]
+patterns = ['^src/myapp/([a-z_]+)/']
+
+# ------------------------------------------------------------------------------ externals
+# A boundary found by file content: every changed file whose text matches ALL the regexes
+# gets an edge to one shared external node. Use it for HTTP clients and SDKs, where there is
+# no import to follow into the other system.
+[[externals]]
+label = "Payments API"
+all = ['PAYMENTS_BASE_URL']
+
+# ------------------------------------------------------------------------------ python
+[python]
+root = "src"                     # module names are relative to this folder
+packages = ["myapp"]             # top-level packages whose imports are internal
+ignore_imports = ["myapp.utils", "myapp.logging"]   # import prefixes never drawn
+collapse_imports = []            # e.g. ["myapp.models"]: every import under the prefix
+                                 # becomes one node for the package
+# stoplist_extra = ["Response"]  # call heads to ignore in flows, on top of the builtins
+
+[python.flows]
+# Flows are sequence diagrams walked from entrypoints through the AST call graph. An
+# entrypoint is a public function in a file matching entry_paths (top-level, or a method
+# named in entry_methods), or any function with a decorator containing one of
+# entry_decorators. Only entry files in the same group as a changed file are scanned, and
+# only flows that reach changed code are kept.
+entry_paths = ["**/views/*.py", "**/views.py", "**/tasks/*.py", "**/tasks.py"]
+entry_decorators = ["api_view", "route", "actor", "task"]
+entry_methods = ["get", "post", "put", "patch", "delete"]
+queue_decorators = ["actor", "task"]         # consumers: their flows start at a queue
+queue_call_suffixes = [".send", ".delay"]    # `fn.send(...)` hops through the queue to fn
+queue_label = "queue"
+orm_markers = [".objects."]                  # calls drawn as database round trips
+db_label = "database"
+http_clients = ["requests.", "httpx."]       # a function calling these is an HTTP bridge;
+http_label = "external API"                  # a dict literal with 3+ string keys in it is
+                                             # shown as the wire payload
+skip_paths = ["**/tracing.py"]               # plumbing never drawn as a participant
+max_depth = 6
+max_steps = 60
+max_flows = 8
+
+# A method name that is an entrypoint only in some files (a serializer's create/update,
+# which the framework calls for the view):
+# [[python.flows.method_entries]]
+# paths = ["**/serializers/**"]
+# methods = ["create", "update"]
+
+# ------------------------------------------------------------------------------ typescript
+# Needs node, and `typescript` installed in the workspace (arch-lens never installs it).
+# Edges are calls resolved by the type checker, not imports.
+[typescript]
+root = "web"                     # the workspace folder
+src_dir = "src"                  # packages are the folders under root; sources are read
+                                 # from <root>/<package>/<src_dir> when it exists
+tsconfig = "tsconfig.json"       # relative to root
+scope_packages = []              # packages always loaded, besides those of changed files
+ignore = []                      # path fragments never expanded (logging, design system)
+hops = 2                         # how far calls are followed out of changed functions
+in_hops = 1                      # how many levels of callers are drawn
+anchor_hops = 1
+max_callers = 8                  # a file called from more files than this is a hub:
+                                 # drawn, never expanded, hidden behind a toggle
+max_flows = 8
+depth = 8
+
+# A call to a declaration matching BOTH regexes (declaring file, symbol name) is drawn as
+# a boundary. kind = "http" renders a request and its response in flows.
+[[typescript.externals]]
+id = "backend"
+label = "backend (HTTP)"
+file = 'lib\.dom\.d\.ts$'
+name = '^fetch$'
+kind = "http"
+
+# ------------------------------------------------------------------------------ plan
+[plan]
+changes_heading = "Changes by layer"     # the table of files the plan will touch
+interface_heading = "Public interface"   # the section with planned signatures
+
+# Plans often write paths relative to one deployable (`orders/views.py`). When a key below
+# appears in the first column of the Changes table, its prefix is prepended.
+[plan.prefixes]
+backend = "src/myapp/"
+web = "web/"
+
+# ------------------------------------------------------------------------------ overview
+# A stable, hand-maintained system map (mermaid flowcharts), shown in its own tab.
+[overview]
+l1 = """flowchart LR
+  user(["User"]) --> app["My service"]
+  app <--> payments[("Payments API")]
+"""
+l2 = """flowchart TB
+  web["web"] --> api["API"]
+  api --> db[("database")]
+"""

@@ -1,0 +1,14 @@
+{
+  "name": "arch-lens",
+  "description": "Arch Lens: generated architecture views of a git branch, for Claude Code.",
+  "owner": {
+    "name": "Noé López"
+  },
+  "plugins": [
+    {
+      "name": "arch-lens",
+      "source": "./",
+      "description": "Generated, plan-vs-as-built architecture views of a git branch."
+    }
+  ]
+}

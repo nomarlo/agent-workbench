@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arch-lens"
+version = "0.1.0"
+description = "Generated, plan-vs-as-built architecture views of a git branch: components, classes, flows."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Noé López" }]
+keywords = ["architecture", "code-review", "diagrams", "mermaid", "claude-code"]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/nomarlo/arch-lens"
+
+[project.scripts]
+arch-lens = "arch_lens.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["arch_lens*"]
+
+[tool.setuptools.package-data]
+arch_lens = ["templates/*.html", "extractors/typescript/*.js"]

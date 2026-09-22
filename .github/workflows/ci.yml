@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax-check the TypeScript extractor
+        run: node --check arch_lens/extractors/typescript/extract.js
+      - name: Tests (end to end on the example shop)
+        run: python -m unittest discover tests -v
+      - name: The package installs and runs
+        run: |
+          python -m pip install .
+          arch-lens --help

@@ -1,0 +1,93 @@
+# arch-lens config for the example shop. Every key is documented in arch-lens.example.toml.
+
+[project]
+name = "shop"
+base = "main"
+
+# Lanes, top to bottom. A dependency may point down (lower rank to higher rank) or stay in
+# its lane; an import or call that points up is drawn red as a layer violation.
+[[layers]]
+name = "web app"
+paths = ["web/app/**"]
+rank = 0
+
+[[layers]]
+name = "web api"
+paths = ["web/api/**"]
+rank = 1
+
+[[layers]]
+name = "views"
+paths = ["backend/**/views.py", "backend/**/views/**"]
+rank = 0
+
+# No rank: exempt from the check. Tasks call services, and services enqueue tasks.
+[[layers]]
+name = "tasks"
+paths = ["backend/**/tasks.py", "backend/**/tasks/**"]
+
+[[layers]]
+name = "serializers"
+paths = ["backend/**/serializers.py"]
+rank = 1
+
+[[layers]]
+name = "services"
+paths = ["backend/**/services.py", "backend/**/services/**"]
+rank = 2
+
+[[layers]]
+name = "adapters"
+paths = ["backend/**/gateway.py", "backend/**/clients/**"]
+rank = 3
+
+[[layers]]
+name = "models"
+paths = ["backend/**/models.py", "backend/**/models/**"]
+rank = 4
+
+[groups]
+patterns = ['^backend/shop/([a-z_]+)/', '^web/([^/]+)/']
+
+[python]
+root = "backend"
+packages = ["shop"]
+ignore_imports = ["shop.core"]
+
+[python.flows]
+db_label = "Postgres"
+queue_label = "task queue"
+http_label = "payment gateway"
+
+[[externals]]
+label = "Payment gateway (HTTP)"
+all = ['PAYMENT_GATEWAY_URL']
+
+[typescript]
+root = "web"
+src_dir = "src"
+tsconfig = "tsconfig.json"
+
+[[typescript.externals]]
+id = "backend"
+label = "shop backend (HTTP)"
+file = 'lib\.dom\.d\.ts$'
+name = '^fetch$'
+kind = "http"
+
+[plan.prefixes]
+backend = "backend/shop/"
+web = "web/"
+
+[overview]
+l1 = """flowchart LR
+  customer(["Customer<br/>browser"]) --> shop["Shop<br/>web app + API"]
+  shop <--> gateway[("Payment gateway")]
+"""
+l2 = """flowchart TB
+  browser["web (TypeScript)"] --> api["backend<br/>views → services → models"]
+  api --> db[("Postgres")]
+  api --> queue[("task queue")]
+  queue --> worker["workers<br/>tasks.py"]
+  api --> gateway[("Payment gateway")]
+"""
