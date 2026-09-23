@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>incident-anatomy</title>
+<meta name="description" content="An interactive, evidence-backed explainer page for one incident, with every code line read from git.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=Spline+Sans+Mono:wght@500&display=swap">
+<style>
+:root { --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#7c7a74; --hairline:#e1e0d9; --accent:#2a78d6; --code-bg:#f0efec; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink-2:#c3c2b7; --muted:#9a9890; --hairline:#2c2c2a; --accent:#3987e5; --code-bg:#232322; } }
+:root[data-theme="dark"] { --page:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink-2:#c3c2b7; --muted:#9a9890; --hairline:#2c2c2a; --accent:#3987e5; --code-bg:#232322; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font-family:"Source Sans 3",system-ui,sans-serif; font-size:16px; line-height:1.55; }
+main { max-width:960px; margin:0 auto; padding:48px 16px 64px; }
+.eyebrow { font-family:"Spline Sans Mono",monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+h1 { font-family:Archivo,sans-serif; font-size:clamp(30px,6vw,46px); line-height:1.1; margin:8px 0 12px; text-wrap:balance; }
+h2 { font-family:Archivo,sans-serif; font-size:21px; margin:36px 0 8px; }
+p, li { color:var(--ink-2); max-width:68ch; }
+code, pre { font-family:"Spline Sans Mono",monospace; font-size:.86em; }
+code { background:var(--code-bg); border-radius:4px; padding:1px 5px; }
+pre { background:var(--code-bg); border-radius:8px; padding:12px 14px; overflow-x:auto; color:var(--ink-2); }
+a { color:var(--accent); }
+a.shot { display:block; margin:24px 0; border:1px solid var(--hairline); border-radius:12px; overflow:hidden; }
+a.shot:hover, a.shot:focus-visible { border-color:var(--accent); outline:none; }
+a.shot img { display:block; width:100%; height:auto; }
+.cta { display:inline-block; margin-top:4px; font-weight:600; }
+footer { margin-top:40px; padding-top:14px; border-top:1px solid var(--hairline); font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow"><a href="../">agent-workbench</a> · incident-anatomy</div>
+  <h1>An incident, explained so that it can be checked</h1>
+  <p>An interactive page for one incident: a step-by-step simulation of the mechanism over the real code lines,
+  what stays retained, the measured evidence, and the fixes as real patches you can toggle to see which path disappears.</p>
+  <a class="cta" href="examples/anatomy.html">Open the live example →</a>
+
+  <a class="shot" href="examples/anatomy.html"><img src="images/simulator.png" alt="The simulator: the flow of one delivery, the exceptions the process keeps, and the highlighted code line"></a>
+
+  <h2>What is checked, and by whom</h2>
+  <ul>
+    <li><b>Code lines</b> are read from git at a pinned commit, with their real numbers. A step can only highlight lines inside its excerpt.</li>
+    <li><b>Fixes</b> are <code>git diff</code> patches that must apply cleanly to that commit.</li>
+    <li><b>Charts and data tables</b> are drawn from the CSV files named in their captions.</li>
+    <li><b>The prose</b> is checked last, by a subagent that has to find the evidence for every number and causal claim.</li>
+  </ul>
+  <p>The example is a synthetic leak in a small export worker. Its evidence comes from running the worker 150 times, with and
+  without each fix, under <code>tracemalloc</code>. The tests fail if the page's claims stop matching that measurement.</p>
+
+  <h2>Install</h2>
+  <pre>/plugin marketplace add nomarlo/agent-workbench
+/plugin install incident-anatomy@agent-workbench</pre>
+
+  <footer><a href="https://github.com/nomarlo/agent-workbench/tree/main/plugins/incident-anatomy">source</a> · <a href="../">all tools</a> · MIT</footer>
+</main>
+</body>
+</html>

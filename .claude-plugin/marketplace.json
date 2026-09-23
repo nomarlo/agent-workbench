@@ -1,12 +1,19 @@
 {
   "name": "agent-workbench",
-  "description": "Tools that make agent-driven development verifiable: generated architecture views, gates and workflows for Claude Code.",
-  "owner": { "name": "Noé López" },
+  "description": "Tools that make agent-driven development verifiable: generated architecture views, evidence-backed incident explainers, gates and workflows for Claude Code.",
+  "owner": {
+    "name": "Noé López"
+  },
   "plugins": [
     {
       "name": "arch-lens",
       "source": "./plugins/arch-lens",
       "description": "Generated, plan-vs-as-built architecture views of a git branch."
+    },
+    {
+      "name": "incident-anatomy",
+      "source": "./plugins/incident-anatomy",
+      "description": "Interactive, evidence-backed explainer page for one incident: the mechanism step by step over real code lines, measured evidence, fixes as patches."
     }
   ]
 }

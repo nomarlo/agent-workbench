@@ -1,0 +1,31 @@
+diff --git a/exporter/worker.py b/exporter/worker.py
+index a7c58b6..8dfffcb 100644
+--- a/exporter/worker.py
++++ b/exporter/worker.py
+@@ -1,5 +1,6 @@
+ """Exports one page of orders per queue message."""
+ 
++import collections
+ import logging
+ 
+ from exporter.records import InvalidRecord, to_warehouse_row
+@@ -13,8 +14,9 @@ class BatchFailed(Exception):
+ 
+ 
+ class ExportWorker:
+-    # Read by the /health endpoint: how many recent batches failed, and why.
+-    recent_failures: list[BaseException] = []
++    # Read by the /health endpoint. Strings, not exceptions: an exception keeps its
++    # traceback, and the traceback keeps every local of every frame alive.
++    recent_failures: collections.deque[str] = collections.deque(maxlen=50)
+ 
+     def __init__(self, warehouse: Warehouse):
+         self.warehouse = warehouse
+@@ -29,6 +31,6 @@ class ExportWorker:
+         try:
+             self.warehouse.insert_many(rows)
+         except WarehouseRejected as error:
+-            ExportWorker.recent_failures.append(error)
++            ExportWorker.recent_failures.append(f"{type(error).__name__}: {error}")
+             raise BatchFailed(f"{len(rows)} rows not exported") from error
+         return len(rows)

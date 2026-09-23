@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incident-anatomy"
+version = "0.1.0"
+description = "An interactive, evidence-backed explainer page for one incident, with every code line read from git."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Noé López" }]
+keywords = ["incident", "postmortem", "debugging", "explainer", "claude-code"]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/nomarlo/agent-workbench/tree/main/plugins/incident-anatomy"
+
+[project.scripts]
+incident-anatomy = "incident_anatomy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["incident_anatomy*"]
+
+[tool.setuptools.package-data]
+incident_anatomy = ["templates/*.html"]

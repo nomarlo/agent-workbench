@@ -1,0 +1,10 @@
+{
+  "name": "incident-anatomy",
+  "version": "0.1.0",
+  "description": "An interactive, evidence-backed explainer page for one incident: a step-by-step simulation of the mechanism over the real code lines, measured evidence, and the fixes as patches that must apply to the commit.",
+  "author": { "name": "Noé López" },
+  "homepage": "https://github.com/nomarlo/agent-workbench/tree/main/plugins/incident-anatomy",
+  "repository": "https://github.com/nomarlo/agent-workbench",
+  "license": "MIT",
+  "keywords": ["incident", "postmortem", "debugging", "explainer", "code-review"]
+}

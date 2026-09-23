@@ -16,6 +16,7 @@ tests and a live demo.
 | Plugin | What it does | Demo |
 |---|---|---|
 | [`arch-lens`](plugins/arch-lens) | Generated architecture view of a branch: components in layer lanes from the real import and call graph, layer violations, class diagram, call-graph flows, and a plan-vs-as-built overlay. | [live](https://nomarlo.github.io/agent-workbench/arch-lens/) |
+| [`incident-anatomy`](plugins/incident-anatomy) | Interactive explainer of one incident: a step-by-step simulation of the mechanism over the real code lines, retained state, measured evidence, and the fixes as patches you can toggle. Every line is read from git, every fix must apply, every chart comes from a data file. | [live](https://nomarlo.github.io/agent-workbench/incident-anatomy/) |
 
 ## Install
 
@@ -24,6 +25,7 @@ As Claude Code plugins, from this marketplace:
 ```
 /plugin marketplace add nomarlo/agent-workbench
 /plugin install arch-lens@agent-workbench
+/plugin install incident-anatomy@agent-workbench
 ```
 
 Each plugin's README also covers using it without Claude Code, for example as a CLI.

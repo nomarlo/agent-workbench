@@ -43,10 +43,16 @@ footer { margin-top:40px; padding-top:14px; border-top:1px solid var(--hairline)
       <div><h2>arch-lens</h2>
       <p>A generated architecture view of a branch, set against the plan it was built from: layer violations, unplanned and missing files, flows.</p></div>
     </a>
+    <a class="card" href="incident-anatomy/">
+      <img src="incident-anatomy/images/simulator.png" alt="incident-anatomy: the simulator stepping through a leak, with the retained exceptions and the highlighted code line">
+      <div><h2>incident-anatomy</h2>
+      <p>An incident explained so that it can be checked: the mechanism step by step over real code lines, measured evidence, and fixes as patches you can toggle.</p></div>
+    </a>
   </div>
 
   <pre>/plugin marketplace add nomarlo/agent-workbench
-/plugin install arch-lens@agent-workbench</pre>
+/plugin install arch-lens@agent-workbench
+/plugin install incident-anatomy@agent-workbench</pre>
 
   <footer><a href="https://github.com/nomarlo/agent-workbench">github.com/nomarlo/agent-workbench</a> · MIT</footer>
 </main>

@@ -1,0 +1,240 @@
+{
+  "title": "Anatomy of a leak: the export worker that kept every failure",
+  "eyebrow": "Example · synthetic incident · export worker",
+  "lede": "How one order with an out-of-range amount turns a health-check list into a memory leak that grows with every redelivery, which lines do it, and where it is cut.",
+  "lang": "en",
+  "repo": "repo",
+  "commit": "HEAD",
+  "facts": [
+    {"label": "Root error", "value": "`WarehouseRejected`: amount out of range, order 137"},
+    {"label": "Anchor", "value": "`ExportWorker.recent_failures`, never trimmed"},
+    {"label": "Slope", "value": "≈0.3 MiB per failed delivery (measured)"}
+  ],
+  "files": {
+    "consumer": {"path": "exporter/consumer.py", "ranges": ["10-18"]},
+    "worker": {"path": "exporter/worker.py", "ranges": ["15-34"]},
+    "records": {"path": "exporter/records.py", "ranges": ["1-16"]},
+    "warehouse": {"path": "exporter/warehouse.py", "ranges": ["4", "11-19"]},
+    "health": {"path": "exporter/health.py", "ranges": ["6-11"]}
+  },
+  "fixes": [
+    {
+      "id": "fix1",
+      "title": "Keep strings, not exceptions, and keep only the last 50",
+      "toggle": "keep strings",
+      "patch": "fixes/fix1-keep-strings.patch",
+      "where": "`exporter/worker.py`, the class attribute (line 17) and the `except` that fills it (line 32).",
+      "why": [
+        "An exception carries `__traceback__`, the traceback references every frame of the stack at the moment of the error, and every frame references its locals. Here those locals are the whole page and every converted row. A string carries none of that.",
+        "The `deque(maxlen=50)` also bounds the list itself. The health endpoint only ever reads `len()` and the last entry, so it keeps working unchanged."
+      ]
+    },
+    {
+      "id": "fix2",
+      "title": "Reject the record before the warehouse does",
+      "toggle": "validate the amount",
+      "patch": "fixes/fix2-validate-amount.patch",
+      "where": "`exporter/records.py`, `to_warehouse_row`.",
+      "why": [
+        "The warehouse column is `numeric(15,2)`, so amounts from 10^11^ up cannot be stored. With the same limit checked while converting, the bad order raises `InvalidRecord`, which `worker.py:27` already catches per record: it is dropped and logged, and the other 499 are exported.",
+        "**With only this fix** the incident disappears but the pattern stays: the next rejection with a different cause reopens the same leak. That is why Fix 1 comes first."
+      ]
+    }
+  ],
+  "simulation": {
+    "iteration": "delivery",
+    "lede": "Every delivery hands the worker page-7: 500 orders, one of them with an amount the warehouse cannot store. Step through it and watch the three panels. Turn the fixes on to see which path disappears.",
+    "seconds_per_iteration": 5,
+    "jumps": [{"label": "+10 deliveries", "iterations": 10}, {"label": "+100 deliveries", "iterations": 100}],
+    "block_label": "ExportWorker.handle(page)",
+    "vars": ["recent_failures", "page-7"],
+    "meter": {
+      "label": "traced memory",
+      "unit": "MiB",
+      "base": 0,
+      "max": 60,
+      "limit": 48,
+      "limit_label": "48 MiB · container limit",
+      "base_label": "start",
+      "decimals": 1,
+      "notes": {
+        "idle": "Nothing retained yet: the first delivery has not failed.",
+        "growing": "{n} failed deliveries retained · ≈{left} more ({left_time}) until the container limit.",
+        "limit": "**Out of memory.** The container is killed and restarts empty, with page-7 still first in the queue: the same slope starts again.",
+        "flat": "Flat: nothing from the delivery survives its end."
+      }
+    },
+    "chain": {
+      "title": "What the process keeps",
+      "owner": "process → class ExportWorker",
+      "anchor": "ExportWorker.recent_failures",
+      "none": "[]",
+      "empty": "Nothing retained yet.",
+      "empty_fixed": "No exception outlives its delivery.",
+      "more": "… {n} more, back to delivery 1. None of it can be collected.",
+      "summary": "Retained: **{count} exceptions ≈ {retained} MiB**, each holding a whole page through its traceback."
+    },
+    "note": "The meter moves by the slope measured in section 03 (≈0.3 MiB per failed delivery), not by a heap snapshot of each step.",
+    "scenarios": [
+      {
+        "when": [],
+        "name": "no fixes · as it happened",
+        "repeats": true,
+        "meter_per_iteration": 0.3,
+        "steps": [
+          {"title": "Delivery {k}: the queue hands page-7 to the worker", "tag": "redelivery", "file": "consumer", "lines": [12, 13, 15],
+           "detail": "The previous delivery failed, so the consumer put the same cursor back: same page, same 500 orders, fetched again as new objects.",
+           "first": {"tag": "first delivery", "detail": "The consumer pops the cursor, fetches the page and calls the worker."},
+           "vars": {"recent_failures": "[{count} × WarehouseRejected]", "page-7": "not exported"}},
+          {"title": "to_warehouse_row: all 500 orders pass", "tag": "records.py:14", "block": true, "file": "records", "lines": [14],
+           "detail": "The amount is converted to cents with no bound. Order 137 carries `250000000000.00`: 2.5·10^13^ cents, beyond what the warehouse column holds. Nothing here knows that."},
+          {"title": "insert_many → WarehouseRejected", "tag": "amount out of range", "tone": "bad", "block": true, "file": "warehouse", "lines": [16, 17, 18], "also": {"worker": [30]},
+           "detail": "The warehouse refuses the whole batch. The exception's traceback now references two frames: `insert_many` (with `rows`) and `handle` (with `page` and `rows`).",
+           "transient": {"title": "WarehouseRejected · delivery {k}", "meta": "traceback: handle → insert_many · locals: page, rows"}},
+          {"title": "except: the exception goes into recent_failures", "tag": "worker.py:32", "tone": "leak", "block": true, "file": "worker", "lines": [31, 32], "also": {"health": [7, 9, 10]},
+           "detail": "Meant for the health endpoint, which only reads `len()` and the last entry. But a class attribute lives as long as the process, and the exception brings its traceback, its frames and their locals with it.",
+           "retain": [{"title": "WarehouseRejected · delivery {k}", "meta": "__traceback__ → frame handle() → page + rows: 1 000 dicts"}],
+           "vars": {"recent_failures": {"value": "[{count} × WarehouseRejected]", "tone": "leak"}}},
+          {"title": "raise BatchFailed from error", "tag": "worker.py:33", "tone": "bad", "block": true, "file": "worker", "lines": [33],
+           "detail": "`BatchFailed` leaves the worker and dies at the end of the delivery, as exceptions should. The list entry does not die."},
+          {"title": "The consumer logs it and redelivers page-7", "tag": "+≈0.3 MiB retained", "tone": "leak", "meter": true, "file": "consumer", "lines": [16, 17, 18],
+           "detail": "The delivery is over. In a normal program its exceptions would be freed here. These are not: `recent_failures` holds delivery {k}'s exception, and through it a whole page. With a redelivery every 5 s the growth is steady until the container runs out.",
+           "vars": {"page-7": {"value": "redelivered ({k} failures)", "tone": "bad"}}}
+        ]
+      },
+      {
+        "when": ["fix1"],
+        "name": "Fix 1 only",
+        "repeats": true,
+        "meter_per_iteration": 0,
+        "steps": [
+          {"title": "Delivery {k}: the queue hands page-7 to the worker", "tag": "redelivery", "file": "consumer", "lines": [12, 13, 15],
+           "detail": "Same cursor, same page. This is still a crash loop on that page, but watch the memory.",
+           "first": {"tag": "first delivery", "detail": "The consumer pops the cursor, fetches the page and calls the worker."},
+           "vars": {"recent_failures": "deque of ≤ 50 strings", "page-7": "not exported"}},
+          {"title": "to_warehouse_row: all 500 orders pass", "tag": "records.py:14", "block": true, "file": "records", "lines": [14],
+           "detail": "Without Fix 2 the bad amount still goes through."},
+          {"title": "insert_many → WarehouseRejected", "tag": "amount out of range", "tone": "bad", "block": true, "file": "warehouse", "lines": [16, 17, 18],
+           "detail": "Same rejection, same traceback holding the page.",
+           "transient": {"title": "WarehouseRejected · delivery {k}", "meta": "traceback: handle → insert_many · locals: page, rows"}},
+          {"title": "except: a string goes into recent_failures", "tag": "Fix 1", "tone": "fixed", "block": true, "file": "worker", "lines": ["+"],
+           "detail": "The list keeps `WarehouseRejected: amount out of range for order o-page-7-137`, a few dozen bytes with no traceback, and never more than 50 of them.",
+           "transient": {"title": "WarehouseRejected · delivery {k}", "meta": "still alive while the except runs; nothing keeps it after"},
+           "vars": {"recent_failures": {"value": "deque of ≤ 50 strings", "tone": "fixed"}}},
+          {"title": "raise BatchFailed from error", "tag": "worker.py:33", "tone": "bad", "block": true, "file": "worker", "lines": [33],
+           "detail": "When the delivery ends nothing references the exception any more: its traceback, its frames and the 500 rows are freed.",
+           "transient": {"title": "WarehouseRejected · delivery {k}", "meta": "freed with the delivery", "freed": true}},
+          {"title": "The consumer redelivers page-7 · memory flat", "tag": "+0 MiB", "tone": "bad", "meter": true, "file": "consumer", "lines": [16, 17, 18],
+           "detail": "The worker stays at its baseline, retrying that page until the data is fixed. Fixing the data is Fix 2's job.",
+           "vars": {"page-7": {"value": "redelivered ({k} failures)", "tone": "bad"}}}
+        ]
+      },
+      {
+        "when": ["fix2"],
+        "name": "Fix 2 only",
+        "repeats": false,
+        "steps": [
+          {"title": "Delivery 1: the queue hands page-7 to the worker", "tag": "first delivery", "file": "consumer", "lines": [12, 13, 15],
+           "detail": "The consumer pops the cursor, fetches the page and calls the worker.",
+           "vars": {"recent_failures": "[]", "page-7": "not exported"}},
+          {"title": "to_warehouse_row rejects order 137", "tag": "InvalidRecord · dropped", "tone": "fixed", "block": true, "file": "records", "lines": ["+"], "also": {"worker": [25, 26, 27, 28]},
+           "detail": "The same limit the warehouse enforces, checked while converting. The `InvalidRecord` is caught per record at `worker.py:27`: logged, dropped, and the loop goes on. It is plain Python and never reaches the warehouse."},
+          {"title": "insert_many: 499 rows · OK", "tag": "no rejection", "block": true, "file": "warehouse", "lines": [15, 16, 17, 19],
+           "detail": "Every amount fits its column."},
+          {"title": "handle returns 499", "tag": "worker.py:34", "block": true, "file": "worker", "lines": [34],
+           "detail": "No exception, nothing appended to `recent_failures`."},
+          {"title": "page-7 exported · the consumer moves on", "tag": "pattern still latent", "tone": "bad", "file": "consumer", "lines": [11, 12],
+           "detail": "No redelivery. But look at the code: the `except` at `worker.py:31-32` is still there. The next `WarehouseRejected` with another cause reopens exactly the same leak. Fix 2 fixes this record; Fix 1 fixes the pattern.",
+           "vars": {"page-7": {"value": "exported (499 of 500)", "tone": "fixed"}}}
+        ]
+      },
+      {
+        "when": ["fix1", "fix2"],
+        "name": "Fix 1 + Fix 2",
+        "repeats": false,
+        "steps": [
+          {"title": "Delivery 1: the queue hands page-7 to the worker", "tag": "first delivery", "file": "consumer", "lines": [12, 13, 15],
+           "detail": "The consumer pops the cursor, fetches the page and calls the worker.",
+           "vars": {"recent_failures": "deque of ≤ 50 strings", "page-7": "not exported"}},
+          {"title": "to_warehouse_row rejects order 137", "tag": "InvalidRecord · dropped", "tone": "fixed", "block": true, "file": "records", "lines": ["+"], "also": {"worker": [25, 26, 27, 28]},
+           "detail": "Dropped and logged per record, before the warehouse."},
+          {"title": "insert_many: 499 rows · OK", "tag": "no rejection", "block": true, "file": "warehouse", "lines": [15, 16, 17, 19],
+           "detail": "Every amount fits its column."},
+          {"title": "handle returns 499", "tag": "worker.py:34", "block": true, "file": "worker", "lines": [34],
+           "detail": "Nothing appended to `recent_failures`."},
+          {"title": "page-7 exported · the consumer moves on", "tag": "closed", "tone": "fixed", "file": "consumer", "lines": [11, 12],
+           "detail": "And with Fix 1 in place, any future rejection with a different cause fails its delivery without retaining anything. Closed.",
+           "vars": {"page-7": {"value": "exported (499 of 500)", "tone": "fixed"}}}
+        ]
+      }
+    ]
+  },
+  "sections": [
+    {
+      "title": "Where each thing lives",
+      "columns": [
+        [
+          {"type": "figure", "card": true,
+           "mermaid": "flowchart TB\n  P[\"worker process · lives for days\"] --> C[\"class ExportWorker\"]\n  C --> L[\"recent_failures: list\"]\n  L --> E1[\"WarehouseRejected · delivery 1\"]\n  L --> E2[\"WarehouseRejected · delivery 2\"]\n  L --> EK[\"… delivery k\"]\n  E1 --> T1[\"__traceback__\"] --> F1[\"frame handle()\"] --> R1[\"page + rows: 1 000 dicts\"]\n  E2 --> T2[\"__traceback__\"] --> F2[\"frame handle()\"] --> R2[\"page + rows: 1 000 dicts\"]",
+           "caption": "The delivery is short-lived, but `recent_failures` belongs to the class, which lives as long as the process. Every entry is a whole exception, and through its traceback every entry keeps the page it failed on."}
+        ],
+        [
+          {"type": "prose", "title": "Why an exception weighs", "paragraphs": [
+            "A Python exception carries `__traceback__`, which references the frames of the stack at the moment of the error, and each frame references its local variables. `handle()` has `page` (500 raw orders) and `rows` (500 converted ones) as locals.",
+            "Normally all of that dies when the `except` block ends. Here it does not, because a list on the class points at the exception. Nobody ever removes an entry."
+          ]},
+          {"type": "prose", "title": "Why it only shows up now", "paragraphs": [
+            "Rejections used to be rare and one-off. It takes one record the warehouse can never accept to turn a rare append into one per redelivery, forever."
+          ]}
+        ]
+      ]
+    },
+    {
+      "title": "Evidence",
+      "lede": "Measured by `measure.py` in this example: 150 deliveries of the same bad page, `tracemalloc` sampled every 10 deliveries, each scenario in a fresh interpreter on a copy of the repository with the fix patches applied.",
+      "columns": [
+        [
+          {"type": "chart", "card": true,
+           "x": {"kind": "number", "label": "deliveries of page-7"},
+           "panels": [
+             {"kind": "line", "data": "evidence/memory-no-fixes.csv", "y": "traced_mib", "label": "traced memory · no fixes", "unit": "MiB"},
+             {"kind": "bar", "data": "evidence/growth-per-sample.csv", "y": "grown_mib", "label": "growth per 10 deliveries · no fixes", "unit": "MiB"},
+             {"kind": "line", "data": "evidence/memory-fix1.csv", "y": "traced_mib", "label": "traced memory · Fix 1", "unit": "MiB", "max": 50}
+           ],
+           "caption": "Top: memory grows in a straight line, one page per failed delivery. Middle: the growth per 10 deliveries is constant. If the leak were inside a delivery it would not accumulate; if it were a cache it would level off. Bottom: with Fix 1, on the same scale, it stays flat. Data: `evidence/*.csv`."}
+        ],
+        [
+          {"type": "table", "title": "Per scenario", "data": "evidence/summary.csv"},
+          {"type": "timeline", "title": "Timeline (illustrative: the example has no production)", "items": [
+            {"t": "09:12", "text": "A customer enters a gift-card order with an amount typo: `250000000000.00`.", "tone": "dim"},
+            {"t": "09:15", "text": "page-7 is fetched for export for the first time.", "tone": "key"},
+            {"t": "09:15", "text": "First `WarehouseRejected`, then redelivery every 5 s.", "tone": "key"},
+            {"t": "09:28", "text": "The container hits its memory limit and is restarted; the same slope starts again.", "tone": "alert"}
+          ]}
+        ]
+      ]
+    },
+    {
+      "title": "Where it is cut",
+      "lede": "Two independent changes. The first removes the leak for any future rejection. The second removes this rejection and turns the bad record into a safe drop, the way invalid records are already handled. The rule behind both: what the code rejects before the warehouse costs nothing; what the warehouse rejects, and the code keeps, is this incident.",
+      "blocks": [
+        {"type": "fixes"},
+        {"type": "table", "card": true,
+         "title": "Limits that hold by coincidence today",
+         "lede": "`to_warehouse_row` bounds nothing. These columns of the warehouse schema (outside this repository) have not failed yet only because the shop's own forms happen to be stricter.",
+         "columns": ["Field", "Warehouse", "to_warehouse_row", "State"],
+         "rows": [
+           ["amount_cents", "`numeric(15,2)`", "none", {"text": "failed", "tone": "warn"}],
+           ["customer", "`varchar(120)`", "`.strip()` only", "latent"],
+           ["order_id", "`varchar(40)`", "required, no length", "latent"],
+           ["notes", "`text`", "none", {"text": "unbounded on both sides", "tone": "ok"}]
+         ]}
+      ]
+    }
+  ],
+  "sources": [
+    "Code: the example repository that `examples/build_demo.py` builds from `examples/export-leak/repo`.",
+    "Evidence: `examples/export-leak/measure.py`, which runs every scenario in a fresh interpreter and writes `evidence/*.csv`.",
+    "Fixes: `examples/export-leak/fixes/*.patch`, written as real edits and exported with `git diff`."
+  ]
+}

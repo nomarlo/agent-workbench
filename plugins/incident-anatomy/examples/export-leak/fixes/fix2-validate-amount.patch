@@ -1,0 +1,26 @@
+diff --git a/exporter/records.py b/exporter/records.py
+index 58e56cb..f5ee293 100644
+--- a/exporter/records.py
++++ b/exporter/records.py
+@@ -1,5 +1,7 @@
+ """Turning raw order rows from the shop into warehouse rows."""
+ 
++AMOUNT_CENTS_LIMIT = 10**13  # the warehouse column is numeric(15,2)
++
+ 
+ class InvalidRecord(ValueError):
+     pass
+@@ -8,9 +10,12 @@ class InvalidRecord(ValueError):
+ def to_warehouse_row(raw: dict) -> dict:
+     if not raw.get("order_id"):
+         raise InvalidRecord("order_id is required")
++    amount_cents = round(float(raw["amount"]) * 100)
++    if abs(amount_cents) >= AMOUNT_CENTS_LIMIT:
++        raise InvalidRecord(f"amount {raw['amount']} does not fit the warehouse column")
+     return {
+         "order_id": raw["order_id"],
+         "customer": raw["customer"].strip(),
+-        "amount_cents": round(float(raw["amount"]) * 100),
++        "amount_cents": amount_cents,
+         "notes": raw.get("notes", ""),
+     }

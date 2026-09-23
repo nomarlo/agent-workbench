@@ -1,0 +1,4 @@
+Scenario,Traced after 150 deliveries (MiB),Growth per delivery (KiB)
+No fixes,44.87,306
+Fix 1 · keep strings,0.02,0
+Fix 2 · validate the amount,0.02,0

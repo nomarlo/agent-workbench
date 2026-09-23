@@ -1,0 +1,33 @@
+name: incident-anatomy
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/incident-anatomy/**", ".github/workflows/ci-incident-anatomy.yml"]
+  pull_request:
+    paths: ["plugins/incident-anatomy/**", ".github/workflows/ci-incident-anatomy.yml"]
+
+defaults:
+  run:
+    working-directory: plugins/incident-anatomy
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tests (end to end on the export-leak example, with the emitted script checked by node)
+        run: python -m unittest discover tests -v
+      - name: The package installs and runs
+        run: |
+          python -m pip install .
+          incident-anatomy --help
